@@ -12,11 +12,12 @@
 
 #define LOOPS (2000*1000000)
 
-volatile static int a, b, c;
+
 
 static void *
 inc_a(void *arg)
 {
+    volatile static int a;
     int i;
     //int a;
     printf("Create inc_a\n");
@@ -27,6 +28,7 @@ inc_a(void *arg)
 static void *
 inc_b(void *arg)
 {
+    volatile static int b;
     int i;
     //int b;
     printf("Create inc_b\n");
@@ -37,6 +39,7 @@ inc_b(void *arg)
 static void *
 inc_c(void *arg)
 {
+    volatile static int c;
     int i;
     //int c;
     printf("Create inc_c\n");
