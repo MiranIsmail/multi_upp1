@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <pthread.h> // pthread types and functions
 
+
 void* child() {
 	printf("This is the child thread.\n");
 }
