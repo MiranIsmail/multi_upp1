@@ -11,7 +11,6 @@
 #define KILO (1024)
 #define MEGA (1024 * 1024)
 #define MAX_ITEMS (64 * MEGA)
-// #define MAX_ITEMS 64
 #define swap(v, a, b) \
     {                 \
         unsigned tmp; \
@@ -19,19 +18,51 @@
         v[a] = v[b];  \
         v[b] = tmp;   \
     }
+
 static int *v;
-
-#define NUM_THREADS 128
-pthread_mutex_t mutex_q;
-
-typedef struct
+/*****************************************************************/
+typedef struct Task
 {
-    int *v;
-    unsigned high;
     unsigned low;
-} task_info;
-task_info Task_queue[NUM_THREADS * NUM_THREADS];
+    unsigned high;
+    int *v;
+
+} Task;
+Task task_q[KILO];
 int task_count = 0;
+int array_sorted = 1;
+pthread_mutex_t taking_q_mutex;
+pthread_mutex_t v_mod;
+pthread_cond_t cond_q;
+#define MAX_THREADS 32
+void check_and_print_if_sorted(int *v, int size)
+{
+    int is_sorted = 1;
+    for (int i = 0; i < size - 1; i++)
+    {
+        if (v[i] > v[i + 1])
+        {
+            is_sorted = 0;
+            break;
+        }
+    }
+    if (is_sorted)
+    {
+        int i;
+        for (i = 0; i < MAX_ITEMS; i++)
+            printf("%d ", v[i]);
+        printf("\n");
+    }
+}
+void add_task(Task task)
+{
+    pthread_mutex_lock(&taking_q_mutex);
+    task_q[task_count] = task;
+    task_count++;
+    pthread_mutex_unlock(&taking_q_mutex);
+    pthread_cond_signal(&cond_q);
+}
+/*****************************************************************/
 
 static void
 print_array(void)
@@ -48,7 +79,7 @@ init_array(void)
     int i;
     v = (int *)malloc(MAX_ITEMS * sizeof(int));
     for (i = 0; i < MAX_ITEMS; i++)
-        v[i] = rand();
+        v[i] = rand() % 100;
 }
 
 static unsigned
@@ -82,19 +113,15 @@ partition(int *v, unsigned low, unsigned high, unsigned pivot_index)
         swap(v, pivot_index, high);
     return high;
 }
-void add_task(task_info task)
-{
-    pthread_mutex_lock(&mutex_q);
-    Task_queue[task_count] = task;
-    task_count++;
-    pthread_mutex_unlock(&mutex_q);
-}
-void quick_sort(int *v, unsigned low, unsigned high)
-{
-    task_info task1;
-    task_info task2;
-    unsigned pivot_index;
 
+void exe_task(Task *task)
+{
+    unsigned low = task->low;
+    unsigned high = task->high;
+    int *v = task->v;
+    Task task_left;
+    Task task_right;
+    unsigned pivot_index;
     /* no need to sort a vector of zero or one element */
     if (low >= high)
         return;
@@ -103,102 +130,96 @@ void quick_sort(int *v, unsigned low, unsigned high)
     pivot_index = (low + high) / 2;
 
     /* partition the vector */
+    pthread_mutex_lock(&v_mod);
     pivot_index = partition(v, low, high, pivot_index);
+    pthread_mutex_unlock(&v_mod);
 
     /* sort the two sub arrays */
     if (low < pivot_index)
     {
+        task_left.v = v;
+        task_left.low = low;
+        task_left.high = pivot_index - 1;
+        add_task(task_left);
         // quick_sort(v, low, pivot_index - 1);
-        task1.v = v;
-        task1.high = pivot_index - 1;
-        task1.low = low;
-        add_task(task1);
     }
+
     if (pivot_index < high)
     {
+        task_right.v = v;
+        task_right.low = pivot_index + 1;
+        task_right.high = high;
+        add_task(task_right);
         // quick_sort(v, pivot_index + 1, high);
-        task2.v = v;
-        task2.low = pivot_index + 1;
-        task2.high = high;
-        add_task(task2);
     }
+    array_sorted = check_if_sorted(v, MAX_ITEMS);
 }
-void excute_task(task_info *task)
+int check_if_sorted(int *v, int size)
 {
-    int *v = task->v;
-    unsigned int low = task->low;
-    unsigned int high = task->high;
-    quick_sort(v, low, high);
-}
-
-void *thread_starter(void *params)
-{
-    int is_done = 1;
-    while (is_done)
-    {
-        int exists = 0;
-        task_info task;
-        pthread_mutex_lock(&mutex_q);
-        if (task_count > 0)
-        {
-            exists = 1;
-            task = Task_queue[0];
-            int i;
-            for (i = 0; i < task_count; i++)
-            {
-                Task_queue[i] = Task_queue[i + 1];
-            }
-            task_count--;
-        }
-        pthread_mutex_unlock(&mutex_q);
-        if (exists == 1)
-        {
-            excute_task(&task);
-        }
-        array_checker(&is_done);
-    }
-}
-void array_checker(int *par)
-{
-    for (int i = 0; i < MAX_ITEMS - 1; i++)
+    for (int i = 0; i < size - 1; i++)
     {
         if (v[i] > v[i + 1])
         {
-            *par = 1;
+            return 1; // Return 1 if the array is not sorted
         }
-        else
+    }
+    return 0; // Return 0 if the array is sorted
+}
+void *start_thread(void *args)
+{
+    while (array_sorted)
+    {
+        Task task;
+        pthread_mutex_lock(&taking_q_mutex);
+        while (task_count == 0)
         {
-            *par = 0;
+            pthread_cond_wait(&cond_q, &taking_q_mutex);
         }
+        task = task_q[0];
+        int i;
+        for (i = 0; i < task_count - 1; i++)
+        {
+            task_q[i] = task_q[i + 1];
+        }
+        task_count--;
+
+        pthread_mutex_unlock(&taking_q_mutex);
+
+        exe_task(&task);
     }
 }
-
 int main(int argc, char **argv)
 {
-    pthread_mutex_init(&mutex_q, NULL);
+    pthread_mutex_init(&taking_q_mutex, NULL);
+    pthread_mutex_init(&v_mod, NULL);
+    pthread_cond_init(&cond_q, NULL);
+    pthread_t threads[MAX_THREADS];
     init_array();
-    // quick_sort(v, 0, MAX_ITEMS - 1);
-    task_info main_task;
-    main_task.v = v;
-    main_task.low = 0;
-    main_task.high = MAX_ITEMS;
-    add_task(main_task);
-    pthread_t threads[NUM_THREADS];
+    Task task;
+    task.high = MAX_ITEMS - 1;
+    task.low = 0;
+    task.v = v;
+    add_task(task);
     int i;
-    for (i = 0; i < NUM_THREADS; i++)
+    for (i = 0; i < MAX_THREADS; i++)
     {
-        if (pthread_create(&threads[i], NULL, &thread_starter, NULL) != 0)
+        if (pthread_create(&threads[i], NULL, &start_thread, NULL) != 0)
         {
-            perror("fail");
+            perror("error");
         }
     }
-    for (i = 0; i < NUM_THREADS; i++)
+    for (i = 0; i < MAX_THREADS; i++)
     {
-        if (pthread_join(threads[i], NULL) != 0)
+        if (pthread_join(threads[i], NULL))
         {
-            perror("fail2");
+            perror("error");
         }
     }
+
+    // quick_sort(v, 0, MAX_ITEMS - 1);
+    //  print_array();
+    pthread_mutex_destroy(&taking_q_mutex);
+    pthread_mutex_destroy(&v_mod);
+    pthread_cond_destroy(&cond_q);
     // print_array();
-    pthread_mutex_destroy(&mutex_q);
 }
