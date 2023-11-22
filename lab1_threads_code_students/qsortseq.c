@@ -11,6 +11,7 @@
 #define KILO (1024)
 #define MEGA (1024 * 1024)
 #define MAX_ITEMS (64 * MEGA)
+// #define MAX_ITEMS 64
 #define swap(v, a, b) \
     {                 \
         unsigned tmp; \
@@ -20,7 +21,7 @@
     }
 static int *v;
 
-#define NUM_THREADS 16
+#define NUM_THREADS 128
 pthread_mutex_t mutex_q;
 
 typedef struct
@@ -132,7 +133,8 @@ void excute_task(task_info *task)
 
 void *thread_starter(void *params)
 {
-    while (1)
+    int is_done = 1;
+    while (is_done)
     {
         int exists = 0;
         task_info task;
@@ -152,6 +154,21 @@ void *thread_starter(void *params)
         if (exists == 1)
         {
             excute_task(&task);
+        }
+        array_checker(&is_done);
+    }
+}
+void array_checker(int *par)
+{
+    for (int i = 0; i < MAX_ITEMS - 1; i++)
+    {
+        if (v[i] > v[i + 1])
+        {
+            *par = 1;
+        }
+        else
+        {
+            *par = 0;
         }
     }
 }
@@ -182,6 +199,6 @@ int main(int argc, char **argv)
             perror("fail2");
         }
     }
-    print_array();
+    // print_array();
     pthread_mutex_destroy(&mutex_q);
 }
