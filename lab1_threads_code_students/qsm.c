@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * "multithreaded qs with threadpool time mesuared inside 2,5s"
+ * "multithreaded qs with threadpool time mesuared 1,3s"
  *
  ***************************************************************************/
 
