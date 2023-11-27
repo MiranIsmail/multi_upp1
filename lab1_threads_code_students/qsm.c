@@ -1,13 +1,13 @@
 /***************************************************************************
  *
- * "multithreaded qs with threadpool time mesuared 1,3s"
+ * "multithreaded qs with threadpool time mesuared inside 1,8s without init_array()"
  *
  ***************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-// #include <sys/time.h>
+#include <sys/time.h>
 
 #define KILO (1024)
 #define MEGA (1024 * 1024)
@@ -22,8 +22,9 @@
 
 static int *v;
 /*****************************************************************/
-#define NUM_TASKS 20
-#define MAX_THREADS 16
+#define NUM_TASKS 16
+#define MAX_THREADS 32
+#define GRANULARITY 200000
 typedef struct Task
 {
     unsigned low;
@@ -34,15 +35,16 @@ typedef struct Task
 Task task_q[NUM_TASKS];
 int task_count = 0;
 pthread_mutex_t taking_q_mutex;
-pthread_mutex_t v_mod;
-pthread_mutex_t exit_mutex;
-pthread_cond_t exit_signal;
-int continue_running = 1;
-int v_threads = MAX_THREADS;
+
+pthread_mutex_t no_task_mutex;
+pthread_cond_t no_task_cond;
+int num_of_threads_running = MAX_THREADS;
+
 void add_task(Task task)
 {
     task_q[task_count] = task;
     task_count++;
+    pthread_cond_signal(&no_task_cond);
 }
 /*****************************************************************/
 
@@ -74,11 +76,6 @@ partition(int *v, unsigned low, unsigned high, unsigned pivot_index)
     pivot_index = low;
     low++;
 
-    /* invariant:
-     * v[i] for i less than low are less than or equal to pivot
-     * v[i] for i greater than high are greater than pivot
-     */
-
     /* move elements into place */
     while (low <= high)
     {
@@ -105,16 +102,14 @@ void exe_task(Task *task)
     Task task_right;
     unsigned pivot_index;
     /* no need to sort a vector of zero or one element */
-    // if (low >= high)
-    //     return;
+    if (low >= high)
+        return;
 
     /* select the pivot value */
     pivot_index = (low + high) / 2;
 
     /* partition the vector */
-    // pthread_mutex_lock(&v_mod);
     pivot_index = partition(v, low, high, pivot_index);
-    // pthread_mutex_unlock(&v_mod);
 
     /* sort the two sub arrays */
     if (low < pivot_index)
@@ -122,7 +117,7 @@ void exe_task(Task *task)
         task_left.v = v;
         task_left.low = low;
         task_left.high = pivot_index - 1;
-        if (task_count < NUM_TASKS - 1)
+        if (task_count < NUM_TASKS - 1 && task_left.high - task_left.low > GRANULARITY)
         {
             pthread_mutex_lock(&taking_q_mutex);
             add_task(task_left);
@@ -132,8 +127,6 @@ void exe_task(Task *task)
         {
             exe_task(&task_left);
         }
-
-        // quick_sort(v, low, pivot_index - 1);
     }
 
     if (pivot_index < high)
@@ -141,7 +134,7 @@ void exe_task(Task *task)
         task_right.v = v;
         task_right.low = pivot_index + 1;
         task_right.high = high;
-        if (task_count < NUM_TASKS - 1)
+        if (task_count < NUM_TASKS - 1 && task_right.high - task_right.low > GRANULARITY)
         {
             pthread_mutex_lock(&taking_q_mutex);
             add_task(task_right);
@@ -151,7 +144,6 @@ void exe_task(Task *task)
         {
             exe_task(&task_right);
         }
-        // quick_sort(v, pivot_index + 1, high);
     }
 }
 int check_if_sorted(int *v, int size)
@@ -168,7 +160,7 @@ int check_if_sorted(int *v, int size)
 void *start_thread()
 {
     Task task;
-    while (continue_running)
+    while (1)
     {
         pthread_mutex_lock(&taking_q_mutex);
         if (task_count > 0)
@@ -184,73 +176,70 @@ void *start_thread()
         }
         else
         {
+
             pthread_mutex_unlock(&taking_q_mutex);
-            pthread_mutex_lock(&v_mod);
-            v_threads--;
-            pthread_mutex_unlock(&v_mod);
-            if (v_threads == 0)
+            pthread_mutex_lock(&no_task_mutex);
+            num_of_threads_running--;
+            if (num_of_threads_running == 0)
             {
-                pthread_mutex_lock(&exit_mutex);
-                pthread_cond_signal(&exit_signal); // Signal other threads to exit
-                continue_running = 0;
-                pthread_mutex_unlock(&exit_mutex);
+                pthread_mutex_unlock(&no_task_mutex);
+                pthread_cond_broadcast(&no_task_cond);
                 return NULL;
             }
+            pthread_cond_wait(&no_task_cond, &no_task_mutex);
+            if (num_of_threads_running == 0)
+            {
+                pthread_mutex_unlock(&no_task_mutex);
+                return NULL;
+            }
+            num_of_threads_running++;
+            pthread_mutex_unlock(&no_task_mutex);
         }
     }
+
     return NULL;
 }
 
 int main(int argc, char **argv)
 {
-    // struct timeval start, end;
-    // long mtime, seconds, useconds;
-    pthread_mutex_init(&taking_q_mutex, NULL);
-    // pthread_mutex_init(&v_mod, NULL);
-    pthread_mutex_init(&exit_mutex, NULL);
-    pthread_cond_init(&exit_signal, NULL);
-    pthread_t threads[MAX_THREADS];
+    struct timeval start, end;
+    long mtime, seconds, useconds;
+
     init_array();
+    gettimeofday(&start, NULL);
+    pthread_mutex_init(&taking_q_mutex, NULL);
+    pthread_mutex_init(&no_task_mutex, NULL);
+    pthread_cond_init(&no_task_cond, NULL);
+
+    pthread_t threads[MAX_THREADS];
     Task task;
     task.high = MAX_ITEMS - 1;
     task.low = 0;
     task.v = v;
     add_task(task);
     int i;
-    // gettimeofday(&start, NULL);
+
     for (i = 0; i < MAX_THREADS; i++)
     {
         pthread_create(&threads[i], NULL, &start_thread, NULL);
-        // {
-        //     perror("error");
-        // }
     }
     ////////////////////////////////////////////////////////
-    while (continue_running)
-    {
-        pthread_cond_wait(&exit_signal, &exit_mutex); // Wait for all threads to exit
-    }
-    pthread_mutex_unlock(&exit_mutex);
     //////////////////////////////////////////////////////
     for (i = 0; i < MAX_THREADS; i++)
     {
         pthread_join(threads[i], NULL);
-        // {
-        //     perror("error");
-        // }
     }
-    // gettimeofday(&end, NULL);
-    // seconds = end.tv_sec - start.tv_sec;
-    // useconds = end.tv_usec - start.tv_usec;
-    // mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
 
-    // printf("Elapsed time: %ld milliseconds\n", mtime);
     pthread_mutex_destroy(&taking_q_mutex);
-    // pthread_mutex_destroy(&v_mod);
-    pthread_mutex_destroy(&exit_mutex);
-    pthread_cond_destroy(&exit_signal);
+    pthread_mutex_destroy(&no_task_mutex);
+    pthread_cond_destroy(&no_task_cond);
 
-    // if (check_if_sorted)
+    gettimeofday(&end, NULL);
+    seconds = end.tv_sec - start.tv_sec;
+    useconds = end.tv_usec - start.tv_usec;
+    mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
+    printf("Elapsed time: %ld milliseconds\n", mtime);
+    // if (check_if_sorted(v, MAX_ITEMS))
     // {
     //     printf("sorted");
     // }
