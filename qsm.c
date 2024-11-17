@@ -204,11 +204,11 @@ void *start_thread()
 
 int main(int argc, char **argv)
 {
-    struct timeval start, end;
-    long mtime, seconds, useconds;
+    //struct timeval start, end;
+    //long mtime, seconds, useconds;
 
     init_array();
-    gettimeofday(&start, NULL);
+    //gettimeofday(&start, NULL);
     pthread_mutex_init(&taking_q_mutex, NULL);
     pthread_mutex_init(&no_task_mutex, NULL);
     pthread_cond_init(&no_task_cond, NULL);
@@ -236,13 +236,13 @@ int main(int argc, char **argv)
     pthread_mutex_destroy(&no_task_mutex);
     pthread_cond_destroy(&no_task_cond);
 
-    gettimeofday(&end, NULL);
-    seconds = end.tv_sec - start.tv_sec;
-    useconds = end.tv_usec - start.tv_usec;
-    mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
-    if (check_if_sorted(v, MAX_ITEMS))
-    {
-        printf("sorted\n");
-    }
-    printf("Elapsed time: %ld milliseconds\n", mtime);
+    //gettimeofday(&end, NULL);
+    //seconds = end.tv_sec - start.tv_sec;
+    //useconds = end.tv_usec - start.tv_usec;
+    //mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
+    //if (check_if_sorted(v, MAX_ITEMS))
+    //{
+    //    printf("sorted\n");
+    //}
+    //printf("Elapsed time: %ld milliseconds\n", mtime);
 }

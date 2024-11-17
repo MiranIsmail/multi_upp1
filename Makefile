@@ -1,12 +1,35 @@
-all: qsort gauss
-		./gaus && ./qsmm
+CC = gcc
+CFLAGS = -O2
+LDFLAGS = -lpthread
+TARGET1 = qsmm
+TARGET2 = gaus
+SRC1 = qsm.c
+SRC2 = gaussian_multi.c
 
-qsort:
-			gcc -O2 -o qsmm qsm.c -lpthread
-			./qsmm
+# Default target
+all: $(TARGET1) $(TARGET2)
 
-gauss:
-			gcc -O2 -o gaus gaussian_multi.c -lpthread
-			./gaus 
+# Rule to build the target (executable)
+$(TARGET1): $(SRC1)
+					$(CC) $(CFLAGS) -o $(TARGET1) $(SRC1) $(LDFLAGS)
+
+
+$(TARGET2): $(SRC2)
+					$(CC) $(CFLAGS) -o $(TARGET2) $(SRC2) $(LDFLAGS)
+
+tq:
+	@echo "running quicksort"
+	@time -f "%E	elapsed" ./$(TARGET1)
+
+
+tg:
+	@echo "running gaussian"
+	@time -f "%E	elapsed" ./$(TARGET2)
+
+ta: tq tg
+
+# Clean up build files
+.PHONY: clean
 clean:
-			rm qsmm && rm gaus
+			rm -f $(TARGET1) $(TARGET2)
+
