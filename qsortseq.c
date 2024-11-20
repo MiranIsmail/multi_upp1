@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/time.h>
 #define KILO (1024)
 #define MEGA (1024*1024)
 #define MAX_ITEMS (64*MEGA)
@@ -88,8 +89,16 @@ quick_sort(int *v, unsigned low, unsigned high)
 int
 main(int argc, char **argv)
 {
+    struct timeval start, end;
+    long mtime, seconds, useconds;
     init_array();
+    gettimeofday(&start, NULL);
     //print_array();
     quick_sort(v, 0, MAX_ITEMS-1);
     //print_array();
+    gettimeofday(&end, NULL);
+    seconds = end.tv_sec - start.tv_sec;
+    useconds = end.tv_usec - start.tv_usec;
+    mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
+    printf("Elapsed time: %ld milliseconds\n", mtime);
 }
