@@ -29,7 +29,12 @@ int Read_Options(int, char **);
 
 pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-pthread_barrier_t barrier;
+struct threadArgs
+{
+    unsigned int thread_id;
+    int start_row;
+    int end_row;
+};
 
 typedef struct {
     int thread_id;
@@ -44,15 +49,15 @@ void *gaussian_row(void *params) {
     int end = args->end_row;
 
     for (int k = 0; k < N; k++) { // Outer loop
-        if (tid == 0) { // Only one thread handles division for row k
+        // Only one thread handles division for row k
+        if (tid == 0) {
+            pthread_mutex_lock(&mutex);  // Lock for the division step
             for (int j = k + 1; j < N; j++)
                 A[k][j] = A[k][j] / A[k][k]; /* Division step */
             y[k] = b[k] / A[k][k];
             A[k][k] = 1.0;
+            pthread_mutex_unlock(&mutex);  // Unlock after division is done
         }
-
-        // Barrier that makes sure that all threads see the updated row k
-        pthread_barrier_wait(&barrier);
 
         // Each thread processes its assigned rows
         for (int i = start; i <= end; i++) {
@@ -64,8 +69,9 @@ void *gaussian_row(void *params) {
             }
         }
 
-        // Barrier waits for all rows to be updated before moving to the next pivot
-        pthread_barrier_wait(&barrier);
+        // After each thread has processed its rows, synchronize before moving to next k
+        pthread_mutex_lock(&mutex);  // Lock before entering the critical section
+        pthread_mutex_unlock(&mutex);  // Unlock after completing all tasks for this pivot
     }
 
     pthread_exit(NULL);
@@ -77,16 +83,12 @@ void work(void) {
 
     int rows_per_thread = (N + NUM_CORES - 1) / NUM_CORES;
 
-    // Initialize barrier
-    pthread_barrier_init(&barrier, NULL, NUM_CORES);
-
     // Create threads
     for (int t = 0; t < NUM_CORES; t++) {
         args[t].thread_id = t;
         args[t].start_row = t * rows_per_thread;
         args[t].end_row = ((t + 1) * rows_per_thread - 1 < N - 1) ?
-                  (t + 1) * rows_per_thread - 1 :
-                  N - 1;
+                          (t + 1) * rows_per_thread - 1 : N - 1;
         pthread_create(&threads[t], NULL, gaussian_row, &args[t]);
     }
 
@@ -94,9 +96,6 @@ void work(void) {
     for (int t = 0; t < NUM_CORES; t++) {
         pthread_join(threads[t], NULL);
     }
-
-    // Destroy barrier
-    pthread_barrier_destroy(&barrier);
 }
 
 
