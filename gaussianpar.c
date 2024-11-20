@@ -29,8 +29,7 @@ int PRINT;          /*print switch */
 matrix A;           /*matrix A */
 double b[MAX_SIZE]; /*vector b */
 double y[MAX_SIZE]; /*vector y */
-pthread_t threads[NUM_CORES]; /* vector threads */
-threadArgs args[NUM_CORES]; /* vector divission thread arguments */
+
 pthread_mutex_t mutexes_1[NUM_CORES];
 pthread_mutex_t mutexes_2[NUM_CORES];
 
@@ -69,10 +68,7 @@ void work(void)
         args[t].end_row = ((t + 1) * rows_per_thread - 1 < N - 1) ?
                   (t + 1) * rows_per_thread - 1 :
                   N - 1;
-        // args[n].start_row = -1;
-        // args[n].end_row = -1;
         args[t].k = -1;
-        // args[n].n = n;
         args[t].active = 1;
         pthread_mutex_lock(&mutexes_2[t]);
         pthread_mutex_lock(&mutexes_1[t]);
@@ -83,25 +79,24 @@ void work(void)
         pthread_mutex_lock(&mutexes_2[i]);
         pthread_mutex_unlock(&mutexes_2[i]);
     }
-    for (int k = 0; k < N; k++)
-    { /*Outer loop */
-        double k_value = A[k][k];
+    for (int k = 0; k < N; k++){ /*Outer loop */
+        double diag = A[k][k]; //diagonal
         for (int j = k + 1; j < N; j++)
-            A[k][j] = A[k][j] / k_value; /*Division step */
-        y[k] = b[k] / k_value;
+            A[k][j] = A[k][j] / diag; /*Division step */
+        y[k] = b[k] / diag;
         A[k][k] = 1.0;
-        int step = N / NUM_CORES;
-        int n = 0;
-        for (int i = k + 1; i < N; i += step)
+        int div = N / NUM_CORES; //division
+        int counter = 0;
+        for (int i = k + 1; i < N; i += div)
         {
-            args[n].start_row = i;
-            args[n].end_row = i + step;
-            args[n].k = k;
-            pthread_mutex_lock(&mutexes_2[n]);
-            pthread_mutex_unlock(&mutexes_1[n]); // start_row thread execution
-            n++;
+            args[counter].start_row = i;
+            args[counter].end_row = i + div;
+            args[counter].k = k;
+            pthread_mutex_lock(&mutexes_2[counter]);
+            pthread_mutex_unlock(&mutexes_1[counter]); // start_row thread execution
+            counter++;
         }
-        for (int j = n; j < NUM_CORES; j++) {
+        for (int j = counter; j < NUM_CORES; j++) {
             if (args[j].active == 1) {
                 args[j].active = 0;
                 pthread_mutex_unlock(&mutexes_1[j]); // Allow unused threads to exit
@@ -109,7 +104,7 @@ void work(void)
             }
         }
         // Wait for threads to finish
-        for (int j = 0; j < n; j++) {
+        for (int j = 0; j < counter; j++) {
             pthread_mutex_lock(&mutexes_2[j]);
             pthread_mutex_unlock(&mutexes_2[j]);
         }
