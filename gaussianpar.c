@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <string.h>
+#include <math.h>
 
 #define MAX_SIZE 2048
 #define NUM_CORES 16
@@ -28,18 +29,6 @@ int Read_Options(int, char **);
 
 pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-struct threadArgs
-{
-    unsigned int row;
-    int *list;
-};
-
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-
-#define NUM_CORES 16
 pthread_barrier_t barrier;
 
 typedef struct {
@@ -57,25 +46,25 @@ void *gaussian_row(void *params) {
     for (int k = 0; k < N; k++) { // Outer loop
         if (tid == 0) { // Only one thread handles division for row k
             for (int j = k + 1; j < N; j++)
-                A[k][j] /= A[k][k];
+                A[k][j] = A[k][j] / A[k][k]; /* Division step */
             y[k] = b[k] / A[k][k];
             A[k][k] = 1.0;
         }
 
-        // Barrier to ensure all threads see updated row k
+        // Barrier that makes sure that all threads see the updated row k
         pthread_barrier_wait(&barrier);
 
         // Each thread processes its assigned rows
         for (int i = start; i <= end; i++) {
             if (i > k) { // Eliminate only rows below the pivot
                 for (int j = k + 1; j < N; j++)
-                    A[i][j] -= A[i][k] * A[k][j];
-                b[i] -= A[i][k] * y[k];
-                A[i][k] = 0.0;
+                    A[i][j] = A[i][j] - A[i][k] * A[k][j]; /* Elimination step */
+                b[i] = b[i] - A[i][k] * y[k];
+                A[i][k] = 0.0; //done with this one
             }
         }
 
-        // Barrier to ensure all rows are updated before moving to the next pivot
+        // Barrier waits for all rows to be updated before moving to the next pivot
         pthread_barrier_wait(&barrier);
     }
 
@@ -95,8 +84,8 @@ void work(void) {
     for (int t = 0; t < NUM_CORES; t++) {
         args[t].thread_id = t;
         args[t].start_row = t * rows_per_thread;
-        args[t].end_row = ((t + 1) * rows_per_thread - 1 < N - 1) ? 
-                  (t + 1) * rows_per_thread - 1 : 
+        args[t].end_row = ((t + 1) * rows_per_thread - 1 < N - 1) ?
+                  (t + 1) * rows_per_thread - 1 :
                   N - 1;
         pthread_create(&threads[t], NULL, gaussian_row, &args[t]);
     }
