@@ -24,7 +24,7 @@
 static int *v;
 /*****************************************************************/
 #define NUM_TASKS 16       // how many tasks can be in the queue this affects the granularity somewhat but not in a big way
-#define MAX_THREADS 32     // how many threads can be running at the same time
+#define MAX_THREADS 16     // how many threads can be running at the same time
 #define GRANULARITY 200000 // this is the minimum size of a task if a task is smaller than this it will be executed by the thread that took it
 typedef struct Task
 {

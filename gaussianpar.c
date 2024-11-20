@@ -95,7 +95,9 @@ void work(void) {
     for (int t = 0; t < NUM_CORES; t++) {
         args[t].thread_id = t;
         args[t].start_row = t * rows_per_thread;
-        args[t].end_row = fmin(N - 1, (t + 1) * rows_per_thread - 1);
+        args[t].end_row = ((t + 1) * rows_per_thread - 1 < N - 1) ? 
+                  (t + 1) * rows_per_thread - 1 : 
+                  N - 1;
         pthread_create(&threads[t], NULL, gaussian_row, &args[t]);
     }
 
@@ -123,10 +125,10 @@ int main(int argc, char **argv)
 void Init_Matrix()
 {
     int i, j;
-    printf("\nsize = %dx%d ", N, N);
-    printf("\nmaxnum = %d \n", maxnum);
-    printf("Init = %s \n", Init);
-    printf("Initializing matrix...");
+    //printf("\nsize = %dx%d ", N, N);
+    //printf("\nmaxnum = %d \n", maxnum);
+    //printf("Init = %s \n", Init);
+    //printf("Initializing matrix...");
     if (strcmp(Init, "rand") == 0)
     {
         for (i = 0; i < N; i++)
@@ -159,7 +161,7 @@ void Init_Matrix()
         b[i] = 2.0;
         y[i] = 1.0;
     }
-    printf("done \n\n");
+    //printf("done \n\n");
     if (PRINT == 1)
         Print_Matrix();
 }

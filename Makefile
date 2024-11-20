@@ -6,7 +6,7 @@ TARGET2 = gaus
 TARGET3 = qseq
 TARGET4 = gseq
 SRC1 = qsm.c
-SRC2 = gaussian_multi.c
+SRC2 = gaussianpar.c
 SRC3 = qsortseq.c
 SRC4 = gaussianseq.c
 
@@ -38,6 +38,9 @@ tg:
 	@echo "running gaussian"
 	@time -f "%E	elapsed" ./$(TARGET2)
 
+dtg:
+	@echo "running gaussian"
+	@time -f "%E	elapsed" ./$(TARGET2) -n 16 -P 1
 tgs:
 	@echo "running gaussin seq"
 	@time -f "%E	elapsed" ./$(TARGET4)
