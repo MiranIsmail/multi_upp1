@@ -39,37 +39,54 @@ typedef struct {
 } threadArgs;
 
 void init_mutexes() {
+
     mutex_start = malloc(NUM_CORES * sizeof(pthread_mutex_t));
     mutex_done = malloc(NUM_CORES * sizeof(pthread_mutex_t));
+    printf("0123");
     for (int i = 0; i < NUM_CORES; i++) {
+
         pthread_mutex_init(&mutex_start[i], NULL);
         pthread_mutex_init(&mutex_done[i], NULL);
+
     }
 }
 
 void *gaussian_row(void *params)
 {
+
+
     threadArgs *args = (threadArgs *)params;
     int curr = args->thread_id;
 
+    // Wait for signal to start working
+    pthread_mutex_lock(&mutex_start[curr]);
     pthread_mutex_unlock(&mutex_done[curr]);
     while (args->active == 1) {// Wait for signal
-        pthread_mutex_lock(&mutex_start[curr]);
-        pthread_mutex_unlock(&mutex_start[curr]);
         if (args->active == 0){ //no longer active
             return NULL;
         }
 
         int start_row = args->start_row;
         int end_row = args->end_row;
+
+
         int k = args->pivot;
+        // printf("The value of start k: %d\n", k);
         for (int i = start_row; i < end_row && i < N; i++) {
-            for (int j = k + 1; j < N; j++)
+            // printf("The value of i is: %d\n", i);
+            // printf("The value of end is: %d\n", end_row);
+            for (int j = k + 1; j < N; j++){
+                if (i < 0 || i >= N || j < 0 || j >= N) {
+                    printf("Thread %d: Accessing out-of-bounds element A[%d][%d] or b[%d]\n", curr, i, j, i);
+                    return NULL;
+                }
                 A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
+            }
             b[i] = b[i] - A[i][k] * y[k];
             A[i][k] = 0.0;
         }
         // Thread is done
+        printf("THREAD IS DONEEEEEEE");
         pthread_mutex_lock(&mutex_start[curr]);
         pthread_mutex_unlock(&mutex_done[curr]);
     }
@@ -80,14 +97,17 @@ int main(int argc, char **argv)
     init_mutexes(); //Initialize mutexes, HELPER FUNCTION
 
     Init_Default();           /* Init default values */
+
     Read_Options(argc, argv); /* Read arguments */
     Init_Matrix();            /* Init the matrix */
+    printf("hej");
     work();
     if (PRINT == 1)
         Print_Matrix();
 }
 
 void work(void){
+
     threadArgs args[NUM_CORES];
     pthread_t children[NUM_CORES];
 
@@ -96,16 +116,23 @@ void work(void){
     for (int t = 0; t < NUM_CORES; t++){ //pass args
         args[t].thread_id = t;
         args[t].start_row = t * rows_per_thread;
+        args[t].pivot = -1;
         int end = (t + 1) * rows_per_thread - 1; //block number * rows
         if (end < N - 1) { //if end does not go out of range
             args[t].end_row = end;
         } else {
             args[t].end_row = N - 1; //last row
         }
+        // printf("t is: %d\n", t);
+        // printf("The value of end is: %d\n", args[t].end_row);
         args[t].active = 1;
-
+        printf("Creating thread %d with start_row = %d, end_row = %d\n", t, args[t].start_row, args[t].end_row);
         pthread_create(&(children[t]), NULL, gaussian_row, (void *)&args[t]);
     }
+    // for (int i = 0; i < NUM_CORES; i++) { //REMOVE
+    //     pthread_mutex_lock(&mutex_done[i]);
+    //     pthread_mutex_unlock(&mutex_done[i]);
+    // }
     for (int k = 0; k < N; k++){ /*Outer loop */
         double diag = A[k][k]; //diagonal
 
@@ -118,6 +145,7 @@ void work(void){
         int counter = 0;
 
         for (int i = k + 1; i < N; i += div){
+            printf("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk: %d\n", k);
             args[counter].pivot = k;
             args[counter].start_row = i;
             args[counter].end_row = i + div;
@@ -138,10 +166,12 @@ void work(void){
             pthread_mutex_unlock(&mutex_done[h]);
         }
     }
+
     for (int i = 0; i < NUM_CORES; i++) {
         pthread_mutex_destroy(&mutex_start[i]);
         pthread_mutex_destroy(&mutex_done[i]);
     }
+
     free(mutex_start);
     free(mutex_done);
 }
