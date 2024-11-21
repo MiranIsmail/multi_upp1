@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <string.h>
+
 #define MAX_SIZE 2048
 #define NUM_CORES 16
 
@@ -90,7 +92,8 @@ void work(void){
     pthread_t children[NUM_CORES];
 
     int rows_per_thread = (N + NUM_CORES - 1) / NUM_CORES;
-    for (int t = 0; t < NUM_CORES; t++){
+
+    for (int t = 0; t < NUM_CORES; t++){ //pass args
         args[t].thread_id = t;
         args[t].start_row = t * rows_per_thread;
         int end = (t + 1) * rows_per_thread - 1; //block number * rows
@@ -105,12 +108,15 @@ void work(void){
     }
     for (int k = 0; k < N; k++){ /*Outer loop */
         double diag = A[k][k]; //diagonal
+
         for (int j = k + 1; j < N; j++)
             A[k][j] = A[k][j] / diag; /*Division step */
         y[k] = b[k] / diag;
         A[k][k] = 1.0;
+
         int div = N / NUM_CORES; //division
         int counter = 0;
+
         for (int i = k + 1; i < N; i += div){
             args[counter].pivot = k;
             args[counter].start_row = i;
