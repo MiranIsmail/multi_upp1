@@ -42,7 +42,6 @@ void init_mutexes() {
 
     mutex_start = malloc(NUM_CORES * sizeof(pthread_mutex_t));
     mutex_done = malloc(NUM_CORES * sizeof(pthread_mutex_t));
-    printf("0123");
     for (int i = 0; i < NUM_CORES; i++) {
 
         pthread_mutex_init(&mutex_start[i], NULL);
@@ -77,7 +76,7 @@ void *gaussian_row(void *params)
             // printf("The value of end is: %d\n", end_row);
             for (int j = k + 1; j < N; j++){
                 if (i < 0 || i >= N || j < 0 || j >= N) {
-                    printf("Thread %d: Accessing out-of-bounds element A[%d][%d] or b[%d]\n", curr, i, j, i);
+                    //printf("Thread %d: Accessing out-of-bounds element A[%d][%d] or b[%d]\n", curr, i, j, i);
                     return NULL;
                 }
                 A[i][j] = A[i][j] - A[i][k] * A[k][j]; /*Elimination step */
@@ -86,7 +85,7 @@ void *gaussian_row(void *params)
             A[i][k] = 0.0;
         }
         // Thread is done
-        printf("THREAD IS DONEEEEEEE");
+        //printf("THREAD IS DONEEEEEEE");
         pthread_mutex_lock(&mutex_start[curr]);
         pthread_mutex_unlock(&mutex_done[curr]);
     }
@@ -100,7 +99,7 @@ int main(int argc, char **argv)
 
     Read_Options(argc, argv); /* Read arguments */
     Init_Matrix();            /* Init the matrix */
-    printf("hej");
+    //printf("hej");
     work();
     if (PRINT == 1)
         Print_Matrix();
@@ -126,7 +125,7 @@ void work(void){
         // printf("t is: %d\n", t);
         // printf("The value of end is: %d\n", args[t].end_row);
         args[t].active = 1;
-        printf("Creating thread %d with start_row = %d, end_row = %d\n", t, args[t].start_row, args[t].end_row);
+        //printf("Creating thread %d with start_row = %d, end_row = %d\n", t, args[t].start_row, args[t].end_row);
         pthread_create(&(children[t]), NULL, gaussian_row, (void *)&args[t]);
     }
     // for (int i = 0; i < NUM_CORES; i++) { //REMOVE
@@ -145,7 +144,7 @@ void work(void){
         int counter = 0;
 
         for (int i = k + 1; i < N; i += div){
-            printf("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk: %d\n", k);
+            //printf("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk: %d\n", k);
             args[counter].pivot = k;
             args[counter].start_row = i;
             args[counter].end_row = i + div;
