@@ -55,13 +55,13 @@ void *gaussian_row(void *params)
 
 
     threadArgs *args = (threadArgs *)params;
-    int curr = args->thread_id;
+    int curr = args->thread_id; // Current thread ID
 
     // Wait for signal to start working
     pthread_mutex_lock(&mutex_start[curr]);
-    pthread_mutex_unlock(&mutex_done[curr]);
+    pthread_mutex_unlock(&mutex_done[curr]);// Unlock the done mutex (signal ready)
     while (args->active == 1) {// Wait for signal
-        if (args->active == 0){ //no longer active
+        if (args->active == 0){ // Exits loop if thread becomes inactive
             return NULL;
         }
 
@@ -86,8 +86,9 @@ void *gaussian_row(void *params)
         }
         // Thread is done
         //printf("THREAD IS DONEEEEEEE");
+        // Wait for the next signal from the main thread
         pthread_mutex_lock(&mutex_start[curr]);
-        pthread_mutex_unlock(&mutex_done[curr]);
+        pthread_mutex_unlock(&mutex_done[curr]); // Signal complete
     }
 }
 
@@ -107,11 +108,12 @@ int main(int argc, char **argv)
 
 void work(void){
 
-    threadArgs args[NUM_CORES];
-    pthread_t children[NUM_CORES];
+    threadArgs args[NUM_CORES]; //store arguments for each thread
+    pthread_t children[NUM_CORES]; // Array of thread handles
 
+    //calculate number of rows per thread by using ceiling division
     int rows_per_thread = (N + NUM_CORES - 1) / NUM_CORES;
-
+    // Initialize all threads
     for (int t = 0; t < NUM_CORES; t++){ //pass args
         args[t].thread_id = t;
         args[t].start_row = t * rows_per_thread;
@@ -124,7 +126,7 @@ void work(void){
         }
         // printf("t is: %d\n", t);
         // printf("The value of end is: %d\n", args[t].end_row);
-        args[t].active = 1;
+        args[t].active = 1; // Set thread as active
         //printf("Creating thread %d with start_row = %d, end_row = %d\n", t, args[t].start_row, args[t].end_row);
         pthread_create(&(children[t]), NULL, gaussian_row, (void *)&args[t]);
     }
@@ -133,7 +135,7 @@ void work(void){
     //     pthread_mutex_unlock(&mutex_done[i]);
     // }
     for (int k = 0; k < N; k++){ /*Outer loop */
-        double diag = A[k][k]; //diagonal
+        double diag = A[k][k]; //diagonal element
 
         for (int j = k + 1; j < N; j++)
             A[k][j] = A[k][j] / diag; /*Division step */
