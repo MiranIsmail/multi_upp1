@@ -142,7 +142,7 @@ void *work(void *arg)
                             for (j = k+1; j < N; j++) {
                                 A[i][j] = A[i][j] - aik * A[k][j]; /* Elimination step */
                             }
-                            b[i] -= b[i] - aik * y[k];
+                            b[i] = b[i] - A[i][k]*y[k];
                             A[i][k] = 0.0;
                         }
                     }
