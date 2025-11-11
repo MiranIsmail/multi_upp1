@@ -155,11 +155,14 @@ int check_if_sorted(int *v, int size)
         {
             return 0; // Return 0 if the array is not sorted
         }
+    printf("%d\n",v[i]);
+
     }
     return 1; // Return 1 if the array is sorted
 } // this function checks if the array is sorted if it is it returns 1 otherwise it returns 0
-void *start_thread()
+void *start_thread(void *arg)
 {
+    (void)arg;
     Task task;
     while (1)
     {
@@ -241,8 +244,8 @@ int main(int argc, char **argv)
     useconds = end.tv_usec - start.tv_usec;
     mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
     if (check_if_sorted(v, MAX_ITEMS))
-    //{
-    //    printf("sorted\n");
-    //}
+    {
+        printf("sorted\n");
+    }
     printf("Elapsed time: %ld milliseconds\n", mtime);
 }
